@@ -15,7 +15,6 @@ import {
   Platform,
   Animated,
   StatusBar,
-  Dimensions,
   ScrollView,
   TextInput,
   BackHandler,
@@ -60,12 +59,12 @@ function App(): React.JSX.Element {
   const [offlineCount, setOfflineCount] = useState(0);
   const [syncStatus, setSyncStatus] = useState('');
   const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
-  
+
   // Refs for background tracking
   const trackingInterval = useRef<NodeJS.Timeout | null>(null);
   const socketRef = useRef<any>(null);
   const offlineLocations = useRef<LocationData[]>([]);
-  
+
   // Animations
   const fadeAnim = useState(new Animated.Value(0))[0];
   const pulseAnim = useState(new Animated.Value(1))[0];
@@ -73,7 +72,7 @@ function App(): React.JSX.Element {
   useEffect(() => {
     initializeApp();
     setupAppStateHandling();
-    
+
     // Fade in animation
     Animated.timing(fadeAnim, {
       toValue: 1,
@@ -84,7 +83,8 @@ function App(): React.JSX.Element {
     return () => {
       cleanup();
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fadeAnim]);
 
   const initializeApp = async () => {
     await loadDriverInfo();
@@ -97,7 +97,7 @@ function App(): React.JSX.Element {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       console.log('App state changed:', nextAppState);
       setAppState(nextAppState);
-      
+
       // Continue tracking even when app goes to background
       if (nextAppState === 'background' && isTracking) {
         console.log('App went to background, continuing location tracking...');
@@ -112,7 +112,7 @@ function App(): React.JSX.Element {
     };
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
-    
+
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
       if (isTracking) {
         Alert.alert(
@@ -120,7 +120,7 @@ function App(): React.JSX.Element {
           'Location tracking is running. The app will continue tracking in the background.',
           [
             { text: 'Continue Tracking', onPress: () => {} },
-            { text: 'Stop Tracking', onPress: () => stopTracking() }
+            { text: 'Stop Tracking', onPress: () => stopTracking() },
           ]
         );
         return true; // Prevent default back behavior
@@ -182,9 +182,9 @@ function App(): React.JSX.Element {
     }
   };
 
-  const saveOfflineLocation = async (location: LocationData) => {
+  const saveOfflineLocation = async (locationData: LocationData) => {
     try {
-      offlineLocations.current.push(location);
+      offlineLocations.current.push(locationData);
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(offlineLocations.current));
       setOfflineCount(offlineLocations.current.length);
     } catch (error) {
@@ -209,13 +209,13 @@ function App(): React.JSX.Element {
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
     });
-    
+
     newSocket.on('connect', () => {
       console.log('Connected to server');
       setConnected(true);
       setConnectionStatus('Connected');
       syncOfflineLocations();
-      
+
       // Register driver if info is available
       if (driverInfo) {
         newSocket.emit('registerDriver', driverInfo);
@@ -274,13 +274,13 @@ function App(): React.JSX.Element {
     try {
       const deviceId = await generateDeviceId();
       const info: DriverInfo = { deviceId, driverName: driverName.trim() };
-      
+
       await saveDriverInfo(info);
-      
+
       if (connected) {
         socket?.emit('registerDriver', info);
       }
-      
+
       Alert.alert('Success', 'Driver registered successfully!');
     } catch (error) {
       Alert.alert('Error', 'Failed to register driver');
@@ -324,7 +324,7 @@ function App(): React.JSX.Element {
           const locationData: LocationData = {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy,
+            accuracy: position.coords.accuracy || 0,
             speed: position.coords.speed || 0,
             heading: position.coords.heading || 0,
             timestamp: new Date().toISOString(),
@@ -339,7 +339,7 @@ function App(): React.JSX.Element {
               const locationData: LocationData = {
                 latitude: position.coords.latitude,
                 longitude: position.coords.longitude,
-                accuracy: position.coords.accuracy,
+                accuracy: position.coords.accuracy || 0,
                 speed: position.coords.speed || 0,
                 heading: position.coords.heading || 0,
                 timestamp: new Date().toISOString(),
@@ -369,10 +369,10 @@ function App(): React.JSX.Element {
   const sendLocation = async (locationData: LocationData) => {
     setLocation(locationData);
     setLastUpdate(new Date());
-    
+
     // Add to history
     setLocationHistory(prev => [locationData, ...prev.slice(0, 9)]);
-    
+
     if (connected && socket) {
       socket.emit('sendLocation', locationData);
       console.log('Location sent to server');
@@ -397,7 +397,7 @@ function App(): React.JSX.Element {
 
     setIsTracking(true);
     startForegroundTracking();
-    
+
     Alert.alert(
       'Tracking Started',
       'Location tracking is now active. Your location will be sent every 10 seconds, even when the app is in the background.',
@@ -408,7 +408,7 @@ function App(): React.JSX.Element {
   const stopTracking = () => {
     setIsTracking(false);
     stopForegroundTracking();
-    
+
     Alert.alert(
       'Tracking Stopped',
       'Location tracking has been stopped.',
@@ -470,20 +470,20 @@ function App(): React.JSX.Element {
     );
     pulseAnimation.start();
     return () => pulseAnimation.stop();
-  }, []);
+  }, [pulseAnim]);
 
   const getStatusColor = () => {
-    if (isTracking) return '#4CAF50';
-    if (connected) return '#2196F3';
+    if (isTracking) {return '#4CAF50';}
+    if (connected) {return '#2196F3';}
     return '#FF5722';
   };
 
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', { 
+    return date.toLocaleTimeString('en-US', {
       hour12: false,
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit'
+      second: '2-digit',
     });
   };
 
@@ -507,9 +507,9 @@ function App(): React.JSX.Element {
               placeholder="Driver Name"
               placeholderTextColor="#666"
             />
-            
+
             <TouchableOpacity
-              style={[styles.button, { backgroundColor: '#4CAF50' }]}
+              style={[styles.button, styles.registerButton]}
               onPress={registerDriver}
             >
               <Text style={styles.buttonText}>Register Driver</Text>
@@ -536,32 +536,32 @@ function App(): React.JSX.Element {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#1565C0" />
       <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
-        
+
         <View style={styles.header}>
           <Text style={styles.logoText}>🚛</Text>
           <View>
             <Text style={styles.title}>Logistics Tracker</Text>
-            <Text style={styles.driverName}>Driver: {driverInfo?.driverName}</Text>
-            <Text style={styles.deviceId}>ID: {driverInfo?.deviceId.slice(-8)}</Text>
+            <Text style={styles.driverName}>Driver: {driverInfo?.driverName || 'Unknown'}</Text>
+            <Text style={styles.deviceId}>ID: {driverInfo?.deviceId ? driverInfo.deviceId.slice(-8) : 'Unknown'}</Text>
           </View>
         </View>
 
         <View style={styles.statusContainer}>
-          <Animated.View 
+          <Animated.View
             style={[
-              styles.statusIndicator, 
-              { 
+              styles.statusIndicator,
+              {
                 backgroundColor: getStatusColor(),
-                transform: [{ scale: pulseAnim }]
-              }
-            ]} 
+                transform: [{ scale: pulseAnim }],
+              },
+            ]}
           />
           <View>
             <Text style={styles.statusText}>
               {isTracking ? 'Tracking Active' : connectionStatus}
             </Text>
             <Text style={styles.appStateText}>
-              App: {appState} {isTracking && appState === 'background' ? '(Tracking in BG)' : ''}
+              App: {appState}{isTracking && appState === 'background' ? ' (Tracking in BG)' : ''}
             </Text>
             {syncStatus ? (
               <Text style={styles.syncText}>{syncStatus}</Text>
@@ -573,7 +573,7 @@ function App(): React.JSX.Element {
           <TouchableOpacity
             style={[
               styles.trackingButton,
-              { backgroundColor: isTracking ? '#FF5722' : '#4CAF50' }
+              isTracking ? styles.stopButton : styles.startButton,
             ]}
             onPress={isTracking ? stopTracking : startTracking}
           >
@@ -591,11 +591,11 @@ function App(): React.JSX.Element {
                 📍 {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
               </Text>
               <Text style={styles.locationDetail}>
-                Accuracy: ±{Math.round(location.accuracy)}m
+                Accuracy: ±{Math.round(location.accuracy || 0)}m
               </Text>
               {location.speed && location.speed > 0 && (
                 <Text style={styles.locationDetail}>
-                  Speed: {Math.round(location.speed * 3.6)} km/h
+                  Speed: {Math.round((location.speed || 0) * 3.6)} km/h
                 </Text>
               )}
               {lastUpdate && (
@@ -637,8 +637,6 @@ function App(): React.JSX.Element {
     </SafeAreaView>
   );
 }
-
-const { width, height } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
   container: {
@@ -703,6 +701,11 @@ const styles = StyleSheet.create({
   },
   appStateText: {
     color: '#BBDEFB',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  syncText: {
+    color: '#4CAF50',
     fontSize: 12,
     marginTop: 2,
   },
@@ -830,6 +833,15 @@ const styles = StyleSheet.create({
   historyCoords: {
     color: 'white',
     fontSize: 12,
+  },
+  registerButton: {
+    backgroundColor: '#4CAF50',
+  },
+  stopButton: {
+    backgroundColor: '#FF5722',
+  },
+  startButton: {
+    backgroundColor: '#4CAF50',
   },
 });
 
