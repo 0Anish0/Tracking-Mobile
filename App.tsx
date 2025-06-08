@@ -26,7 +26,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import DeviceInfo from 'react-native-device-info';
 import io from 'socket.io-client';
 
-const SOCKET_URL = 'http://192.168.48.202:3001'; // Replace with your server IP
+const SOCKET_URL = 'https://tracking-backend-4mnn.onrender.com'; // Your deployed backend URL
 const LOCATION_INTERVAL = 10000; // 10 seconds
 const STORAGE_KEY = 'offline_locations';
 const DRIVER_KEY = 'driver_info';
@@ -218,7 +218,7 @@ function App(): React.JSX.Element {
 
       // Register driver if info is available
       if (driverInfo) {
-        newSocket.emit('registerDriver', driverInfo);
+        newSocket.emit('register-driver', driverInfo);
       }
     });
 
@@ -278,7 +278,7 @@ function App(): React.JSX.Element {
       await saveDriverInfo(info);
 
       if (connected) {
-        socket?.emit('registerDriver', info);
+        socket?.emit('register-driver', info);
       }
 
       Alert.alert('Success', 'Driver registered successfully!');
@@ -373,8 +373,15 @@ function App(): React.JSX.Element {
     // Add to history
     setLocationHistory(prev => [locationData, ...prev.slice(0, 9)]);
 
-    if (connected && socket) {
-      socket.emit('sendLocation', locationData);
+    if (connected && socket && driverInfo) {
+      // Add driver info to location data
+      const locationWithDriver = {
+        ...locationData,
+        deviceId: driverInfo.deviceId,
+        driverName: driverInfo.driverName
+      };
+      
+      socket.emit('location-update', locationWithDriver);
       console.log('Location sent to server');
     } else {
       // Store offline
